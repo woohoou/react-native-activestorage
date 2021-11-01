@@ -10,10 +10,11 @@ interface OnSuccessParams {
 
 export type Params = {
   onSuccess?: (params: OnSuccessParams) => void;
+  onError?: (params: unknown) => void;
 }
 
-const useDirectUpload = ({ onSuccess }: Params = {}) => {
-  const { directUploadsUrl } = useConfig();
+const useDirectUpload = ({ onSuccess, onError }: Params = {}) => {
+  const { directUploadsUrl, headers } = useConfig();
   const [uploads, setUploads] = useState<DirectUploadResult[]>([]);
 
   const handleFileUploadChange = useCallback((fileUpload: DirectUploadResult) => {
@@ -22,20 +23,25 @@ const useDirectUpload = ({ onSuccess }: Params = {}) => {
 
   const upload = useCallback(
     async (files: File[]) => {
-      const signedIds = await Promise.all(
-        files.map((file) =>
-          directUpload({ file, directUploadsUrl, onStatusChange: handleFileUploadChange })
-        )
-      );
-
-      const validIds = signedIds.filter((it) => !!it) as string[];
-      if (validIds.length > 0) {
-        onSuccess && onSuccess({ signedIds: validIds });
+      try {
+        const signedIds = await Promise.all(
+          files.map((file) =>
+            directUpload({ file, directUploadsUrl, headers, onStatusChange: handleFileUploadChange })
+          )
+        );
+  
+        const validIds = signedIds.filter((it) => !!it) as string[];
+        if (validIds.length > 0) {
+          onSuccess && onSuccess({ signedIds: validIds });
+        }
+  
+        return { signedIds: validIds }
+      } catch(err) {
+        onError && onError(err);
+        return {}
       }
-
-      return { signedIds: validIds }
     },
-    [handleFileUploadChange, onSuccess]
+    [handleFileUploadChange, onSuccess, onError]
   );
 
   const uploading = useMemo(() => uploads.some((upload) => upload.status === 'uploading'), [uploads]);
