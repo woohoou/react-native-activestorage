@@ -11,7 +11,12 @@ interface DirectUploadParams {
   onStatusChange: (data: DirectUploadResult) => void;
 }
 
-const directUpload = ({ directUploadsUrl, file, headers, onStatusChange }: DirectUploadParams) => {
+const directUpload = ({
+  directUploadsUrl,
+  file,
+  headers,
+  onStatusChange,
+}: DirectUploadParams) => {
   const taskId = ++id;
   let canceled = false;
   let task: StatefulPromise<FetchBlobResponse>;
@@ -31,34 +36,39 @@ const directUpload = ({ directUploadsUrl, file, headers, onStatusChange }: Direc
 
   handleStatusUpdate({ status: 'waiting' });
 
-  return new Promise<string | void>(async (resolve) => {
+  return new Promise<string | void>(async (resolve, reject) => {
     try {
       const blobData = await createBlobRecord({
         directUploadsUrl,
         file,
         headers,
       });
-
       const { url, headers: uploadHeaders } = blobData.direct_upload;
-
       const fileData = RNFetchBlob.wrap(file.path);
-
       task = RNFetchBlob.fetch('PUT', url, uploadHeaders, fileData);
-
       task
         .uploadProgress({ interval: 250 }, (uploadedBytes, totalBytes) => {
           const progress = (uploadedBytes / totalBytes) * 100;
-          handleStatusUpdate({ status: 'uploading', progress, totalBytes, uploadedBytes });
+          handleStatusUpdate({
+            status: 'uploading',
+            progress,
+            totalBytes,
+            uploadedBytes,
+          });
         })
         .then((resp) => {
           const status = resp.info().status;
           if (status >= 200 && status < 400) {
             handleStatusUpdate({ status: 'success' });
+            resolve(blobData.signed_id);
           } else {
-            handleStatusUpdate({ status: 'error', error: new Error('Response not success') });
+            const error = new Error('Response not success');
+            handleStatusUpdate({
+              status: 'error',
+              error,
+            });
+            reject(error);
           }
-
-          resolve(blobData.signed_id);
         })
         .catch((err) => {
           if (canceled) {
@@ -67,11 +77,11 @@ const directUpload = ({ directUploadsUrl, file, headers, onStatusChange }: Direc
             handleStatusUpdate({ status: 'error', error: err });
           }
 
-          resolve();
+          reject(err);
         });
     } catch (err) {
       handleStatusUpdate({ status: 'error', error: err });
-      return resolve();
+      return reject(err);
     }
   });
 };

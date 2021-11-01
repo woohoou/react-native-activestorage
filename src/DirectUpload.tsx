@@ -3,12 +3,12 @@ import useDirectUpload, { Params } from './useDirectUpload';
 
 type Props = {
   children: (data: ReturnType<typeof useDirectUpload>) => ReactNode;
-} & Params
+} & Params;
 
-const DirectUpload = ({ children, onSuccess }: Props) => {
-  const data = useDirectUpload({ onSuccess });
+const DirectUpload = ({ children, onSuccess, onError }: Props) => {
+  const data = useDirectUpload({ onSuccess, onError });
 
   return children(data);
-}
+};
 
 export default DirectUpload;
